@@ -1,8 +1,15 @@
 import pino from "pino";
 import { resolve } from "path";
+import fs from "fs";
+
+const logDir = resolve(__dirname, "../logs");
+
+if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+}
 
 const fileTransport = pino.destination({
-    dest: resolve(__dirname, "../logs/server.log"),
+    dest: resolve(logDir, "server.log"),
     sync: false,
 });
 
