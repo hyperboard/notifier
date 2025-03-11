@@ -207,7 +207,7 @@ class TelegramNotifier {
 			await this.bot.api.setMyCommands(commands);
 			logger.info("Bot commands set successfully");
 		} catch (error) {
-			logger.error("Failed to set bot commands:", error);
+			logger.error({ error }, "Failed to set bot commands:");
 		}
 	}
 
@@ -255,7 +255,7 @@ class TelegramNotifier {
 
 			this.processMessageQueue();
 		} catch (error) {
-			logger.error("Failed to send message:", error);
+			logger.error({ error }, "Failed to send message:");
 			throw error;
 		}
 	}
@@ -351,7 +351,7 @@ async function main() {
 
 	// Start the bot (non-blocking)
 	await telegramNotifier.start().catch(error => {
-		logger.error("Failed to start Telegram bot:", error);
+		logger.error({ error }, "Failed to start Telegram bot:");
 	});
 
 	app.post(
@@ -367,7 +367,7 @@ async function main() {
 		async c => {
 			try {
 				const body = await c.req.json<TelegramMessage>();
-				logger.info("notifier body", body);
+				logger.info({ body }, "notifier body");
 				await telegramNotifier.sendMessage(
 					body.text,
 					body.env,
