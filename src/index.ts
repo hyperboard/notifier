@@ -7,8 +7,9 @@ import { prettyJSON } from "hono/pretty-json";
 import { timing } from "hono/timing";
 import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
 import { Bot, GrammyError, HttpError } from "grammy";
+import path from "path";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 const app = new Hono();
 
@@ -191,7 +192,7 @@ class TelegramNotifier {
 				},
 			});
 		} catch (error) {
-			logger.error("Failed to start Telegram bot:", error);
+			logger.error({ error }, "Failed to start Telegram bot:");
 			throw error;
 		}
 	}
@@ -420,7 +421,7 @@ async function main() {
 		},
 	);
 
-	const port = process.env.PORT || 3000;
+	const port = process.env.NOTIFIER_PORT || 3000;
 
 	process.on("uncaughtException", error => {
 		logger.fatal(
