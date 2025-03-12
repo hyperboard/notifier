@@ -12,25 +12,6 @@ import { existsSync } from "fs";
 
 dotenv.config();
 
-function findEnvFile(startDir: string) {
-	let currentDir = startDir;
-
-	while (currentDir !== path.parse(currentDir).root) {
-		const envPath = path.join(currentDir, ".env");
-		if (existsSync(envPath)) {
-			console.log("Found .env file at:", envPath);
-			return envPath;
-		}
-		currentDir = path.dirname(currentDir);
-	}
-
-	console.log(".env file not found");
-	return null;
-}
-
-const startDirectory = __dirname; // Start from the current directory
-findEnvFile(startDirectory);
-
 const app = new Hono();
 
 if (process.env.NODE_ENV !== "production") {
