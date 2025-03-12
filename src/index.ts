@@ -9,20 +9,28 @@ import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
 import { Bot, GrammyError, HttpError } from "grammy";
 import path from "path";
 import { readFile } from "fs/promises";
+import { existsSync } from "fs";
 
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
-try {
-	const fileContent = await readFile(
-		path.resolve(__dirname, "../../../.env"),
-		"utf-8",
-	);
-	console.log("File content:", fileContent);
-} catch (error) {
-	console.error("Error reading file:", error);
+function findEnvFile(startDir: string) {
+	let currentDir = startDir;
+
+	while (currentDir !== path.parse(currentDir).root) {
+		const envPath = path.join(currentDir, ".env");
+		if (existsSync(envPath)) {
+			console.log("Found .env file at:", envPath);
+			return envPath;
+		}
+		currentDir = path.dirname(currentDir);
+	}
+
+	console.log(".env file not found");
+	return null;
 }
 
-console.log("env", Bun.env);
+const startDirectory = __dirname; // Start from the current directory
+findEnvFile(startDirectory);
 
 const app = new Hono();
 
