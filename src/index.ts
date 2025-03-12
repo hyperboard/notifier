@@ -8,8 +8,21 @@ import { timing } from "hono/timing";
 import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
 import { Bot, GrammyError, HttpError } from "grammy";
 import path from "path";
+import { readFile } from "fs/promises";
 
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
+try {
+	const fileContent = await readFile(
+		path.resolve(__dirname, "../../../.env"),
+		"utf-8",
+	);
+	console.log("File content:", fileContent);
+} catch (error) {
+	console.error("Error reading file:", error);
+}
+
+console.log("env", Bun.env);
 
 const app = new Hono();
 
