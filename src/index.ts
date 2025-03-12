@@ -8,10 +8,9 @@ import { timing } from "hono/timing";
 import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
 import { Bot, GrammyError, HttpError } from "grammy";
 import path from "path";
-import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config();
 
 function findEnvFile(startDir: string) {
 	let currentDir = startDir;
