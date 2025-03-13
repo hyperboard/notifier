@@ -8,9 +8,8 @@ import { timing } from "hono/timing";
 import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
 import { Bot, GrammyError, HttpError } from "grammy";
 import path from "path";
-import { existsSync } from "fs";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 const app = new Hono();
 
