@@ -48,6 +48,6 @@ export class MetricsCache {
 • Renewals Today: ${data.renewalsToday}
 • Total Paying Users: ${data.totalPayingUsers}
 
-Note: Metrics are updated every 12 hours at 11:00 and 23:00.`;
+Note: Metrics are updated every 12 hours at 11:00 and 23:00 or when the server is rebooted.`;
 	}
 }
