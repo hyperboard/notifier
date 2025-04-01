@@ -243,6 +243,7 @@ class TelegramNotifier {
 				await ctx.reply(`Source with ID ${sourceId} not found.`);
 				return;
 			}
+			await this.metricsCache.updateMetrics();
 			const formattedMetrics = this.metricsCache.formatMetrics(sourceId);
 			await ctx.reply(formattedMetrics, { parse_mode: "Markdown" });
 		});
@@ -359,7 +360,7 @@ ${JSON.stringify(message.meta.msg, null, 2)}
 			return this.metricsCache.formatMetrics(source.id);
 		}).join("\n\n");
 
-		this.sendMessage(formattedMetrics);
+		this.bot.api.sendMessage(this.groupChatId, formattedMetrics);
 	}
 
 	public async setupCronJob() {
