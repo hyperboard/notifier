@@ -19,23 +19,23 @@ export class MetricsCache {
 	private metrics: DashboardMetrics[] = [];
 
 	public async updateMetrics() {
-		this.metrics = (
-			await Promise.allSettled(
-				SOURCES.map(async source => {
-					const res = await fetch(source.link);
-					const json = (await res.json()) as Omit<
-						DashboardMetrics,
-						"lastUpdated" | "id" | "name"
-					>;
-					return {
-						...json,
-						id: source.id,
-						name: source.name,
-						lastUpdated: new Date(),
-					};
-				}),
-			)
-		)
+		const results = await Promise.allSettled(
+			SOURCES.map(async source => {
+				const res = await fetch(source.link);
+				const json = (await res.json()) as Omit<
+					DashboardMetrics,
+					"lastUpdated" | "id" | "name"
+				>;
+				return {
+					...json,
+					id: source.id,
+					name: source.name,
+					lastUpdated: new Date(),
+				};
+			}),
+		);
+
+		this.metrics = results
 			.filter(res => res.status === "fulfilled")
 			.map(res => res.value);
 		logger.debug("Metrics cache updated");

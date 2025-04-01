@@ -356,14 +356,14 @@ ${JSON.stringify(message.meta.msg, null, 2)}
 
 	public async updateMetricsCache() {
 		await this.metricsCache.updateMetrics();
-		const formattedMetrics = SOURCES.map(async source => {
+		const formattedMetrics = SOURCES.map(source => {
 			return this.metricsCache.formatMetrics(source.id);
 		}).join("\n\n");
 
-		this.bot.api.sendMessage(this.groupChatId, formattedMetrics);
+		await this.bot.api.sendMessage(this.groupChatId, formattedMetrics);
 	}
 
-	public async setupCronJob() {
+	public setupCronJob() {
 		this.job = CronJob.from({
 			cronTime: "0 8,20 * * *",
 			onTick: this.updateMetricsCache.bind(this),
