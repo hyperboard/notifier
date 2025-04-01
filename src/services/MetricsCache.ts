@@ -1,6 +1,9 @@
+import { SOURCES } from "@/source";
 import { logger } from "../logger";
 
 export interface DashboardMetrics {
+	id: string;
+	name: string;
 	totalBoards: number;
 	newBoardsToday: number;
 	totalUsers: number;
@@ -13,32 +16,47 @@ export interface DashboardMetrics {
 }
 
 export class MetricsCache {
-	private metrics: DashboardMetrics | null = null;
+	private metrics: DashboardMetrics[] = [];
 
-	public updateMetrics(metrics: Omit<DashboardMetrics, "lastUpdated">) {
-		this.metrics = {
-			...metrics,
-			lastUpdated: new Date(),
-		};
+	public async updateMetrics() {
+		this.metrics = await Promise.all(
+			SOURCES.map(async source => {
+				const res = await fetch(source.link);
+				const json = (await res.json()) as Omit<
+					DashboardMetrics,
+					"lastUpdated" | "id" | "name"
+				>;
+				return {
+					...json,
+					id: source.id,
+					name: source.name,
+					lastUpdated: new Date(),
+				};
+			}),
+		);
 		logger.debug("Metrics cache updated");
 	}
 
-	public getMetrics(): DashboardMetrics | null {
-		return this.metrics;
+	public getMetrics(sourceId: string): DashboardMetrics | null {
+		return this.metrics.find(m => m.id === sourceId) || null;
 	}
 
-	public formatMetrics(): string {
-		if (!this.metrics) {
+	public formatMetrics(sourceId: string): string {
+		if (this.metrics.length === 0) {
 			return "No metrics data available yet. Metrics are updated every 12 hours at 11:00 and 23:00.";
 		}
 
-		const { lastUpdated, ...data } = this.metrics;
+		const metrics = this.getMetrics(sourceId);
+		if (!metrics) {
+			return `No metrics data available for source: ${sourceId}`;
+		}
+		const { lastUpdated, ...data } = metrics;
 		const formattedDate = lastUpdated.toLocaleString("en-US", {
 			dateStyle: "short",
 			timeStyle: "short",
 		});
 
-		return `📊 Dashboard Metrics (Last updated: ${formattedDate}):
+		return `📊 Dashboard Metrics (Last updated: ${formattedDate}, env: ${data.name}):
 • Total Boards: ${data.totalBoards}
 • New Boards Today: ${data.newBoardsToday}
 • Total Users: ${data.totalUsers}

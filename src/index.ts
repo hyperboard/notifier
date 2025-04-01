@@ -1,13 +1,15 @@
-import { Hono } from "hono";
-import dotenv from "dotenv";
 import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import { logger } from "./logger";
+import { CronJob } from "cron";
+import dotenv from "dotenv";
+import { Bot, GrammyError, HttpError } from "grammy";
+import { Hono } from "hono";
 import { prettyJSON } from "hono/pretty-json";
 import { timing } from "hono/timing";
-import { MetricsCache, DashboardMetrics } from "./services/MetricsCache";
-import { Bot, GrammyError, HttpError } from "grammy";
 import path from "path";
+import { z } from "zod";
+import { logger } from "./logger";
+import { MetricsCache } from "./services/MetricsCache";
+import { SOURCES } from "./source";
 
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
@@ -109,6 +111,7 @@ class TelegramNotifier {
 	private messageQueue: Array<{ message: string; options?: any }> = [];
 	private isProcessingQueue = false;
 	private readonly RATE_LIMIT_DELAY = 1000; // 1 second between messages
+	private job: CronJob | null = null;
 
 	constructor(config: {
 		token: string;
@@ -121,6 +124,7 @@ class TelegramNotifier {
 		this.source = config.source;
 		this.groupChatId = config.groupChatId;
 		this.metricsCache = new MetricsCache();
+		this.setupCronJob();
 
 		logger.info(`TelegramNotifier initialized with source: ${this.source}`);
 		logger.info(`Group chat ID: ${this.groupChatId}`);
@@ -201,6 +205,7 @@ class TelegramNotifier {
 		const commands = [
 			{ command: "start", description: "Start the bot" },
 			{ command: "metrics", description: "Get metrics dashboard" },
+			{ command: "sources", description: "Get source list" },
 			{ command: "hello", description: "Hello" },
 		];
 
@@ -228,8 +233,27 @@ class TelegramNotifier {
 		});
 
 		this.bot.command("metrics", async ctx => {
-			const formattedMetrics = this.metricsCache.formatMetrics();
+			const sourceId = ctx.match;
+			if (!sourceId) {
+				await ctx.reply("Please provide a source ID.");
+				return;
+			}
+			const source = SOURCES.find(s => s.id === sourceId);
+			if (!source) {
+				await ctx.reply(`Source with ID ${sourceId} not found.`);
+				return;
+			}
+			const formattedMetrics = this.metricsCache.formatMetrics(sourceId);
 			await ctx.reply(formattedMetrics, { parse_mode: "Markdown" });
+		});
+
+		this.bot.command("sources", async ctx => {
+			const formattedSources = SOURCES.map(source => {
+				return `- [${source.id}] - ${source.name}`;
+			}).join("\n");
+			await ctx.reply(`- [id] - name\n${formattedSources}`, {
+				parse_mode: "Markdown",
+			});
 		});
 	}
 
@@ -329,9 +353,22 @@ ${JSON.stringify(message.meta.msg, null, 2)}
 		return message;
 	}
 
-	public updateMetricsCache(metrics: Omit<DashboardMetrics, "lastUpdated">) {
-		this.metricsCache.updateMetrics(metrics);
-		return this.metricsCache.formatMetrics();
+	public async updateMetricsCache() {
+		await this.metricsCache.updateMetrics();
+		const formattedMetrics = SOURCES.map(async source => {
+			return this.metricsCache.formatMetrics(source.id);
+		}).join("\n\n");
+
+		this.sendMessage(formattedMetrics);
+	}
+
+	public async setupCronJob() {
+		this.job = CronJob.from({
+			cronTime: "0 8,20 * * *",
+			onTick: this.updateMetricsCache.bind(this),
+			start: true,
+			timeZone: "Europe/Moscow",
+		});
 	}
 }
 
@@ -379,42 +416,6 @@ async function main() {
 				logger.error({ error }, "Notification error");
 				return c.json(
 					{ success: false, error: "Failed to send notification" },
-					500,
-				);
-			}
-		},
-	);
-
-	app.post(
-		"/metrics",
-		zValidator(
-			"json",
-			z.object({
-				totalBoards: z.number(),
-				newBoardsToday: z.number(),
-				totalUsers: z.number(),
-				newUsersToday: z.number(),
-				totalBoardEvents: z.number(),
-				firstPaymentsToday: z.number(),
-				renewalsToday: z.number(),
-				totalPayingUsers: z.number(),
-				env: z.string(),
-			}),
-		),
-		async c => {
-			try {
-				const metrics = c.req.valid("json");
-				const formattedMessage =
-					telegramNotifier.updateMetricsCache(metrics);
-				await telegramNotifier.sendMessage(
-					formattedMessage,
-					metrics.env,
-				);
-				return c.json({ success: true });
-			} catch (error) {
-				logger.error({ error }, "Metrics error");
-				return c.json(
-					{ success: false, error: "Failed to send metrics" },
 					500,
 				);
 			}
