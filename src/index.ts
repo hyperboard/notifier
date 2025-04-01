@@ -369,7 +369,7 @@ ${JSON.stringify(message.meta.msg, null, 2)}
 			onTick: this.updateMetricsCache.bind(this),
 			start: true,
 			timeZone: "Europe/Moscow",
-			runOnInit: true,
+			// runOnInit: true,
 		});
 	}
 }
