@@ -365,7 +365,7 @@ ${JSON.stringify(message.meta.msg, null, 2)}
 
 	public setupCronJob() {
 		this.job = CronJob.from({
-			cronTime: "0 8,20 * * *",
+			cronTime: "0 11,23 * * *",
 			onTick: this.updateMetricsCache.bind(this),
 			start: true,
 			timeZone: "Europe/Moscow",
