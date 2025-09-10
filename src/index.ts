@@ -11,7 +11,7 @@ import { logger } from "./logger";
 import { MetricsCache } from "./services/MetricsCache";
 import { SOURCES } from "./source";
 
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = new Hono();
 
