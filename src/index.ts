@@ -102,6 +102,14 @@ interface TelegramMessage {
 	};
 }
 
+interface LogPayload {
+	level: "info" | "warn" | "error" | "fatal";
+	message: string;
+	service: string;
+	env: string;
+	context?: Record<string, any>;
+}
+
 class TelegramNotifier {
 	private bot: Bot;
 	private isEnabled: boolean;
@@ -131,6 +139,16 @@ class TelegramNotifier {
 
 		// Set up error handling for the bot
 		this.setupErrorHandling();
+	}
+
+	private escapeMarkdown(text: string): string {
+		const charsToEscape = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+
+		let escapedText = text;
+		for (const char of charsToEscape) {
+			escapedText = escapedText.replace(new RegExp('\\' + char, 'g'), '\\' + char);
+		}
+		return escapedText;
 	}
 
 	private setupErrorHandling() {
@@ -286,23 +304,77 @@ class TelegramNotifier {
 		}
 	}
 
+	async sendLog(log: LogPayload) {
+		if (!this.isEnabled) {
+			logger.info("Log sending skipped - Telegram service is disabled");
+			return;
+		}
+
+		const formattedLog = this.formatLogMessage(log);
+		this.enqueueMessage(formattedLog);
+	}
+
+	private enqueueMessage(message: string) {
+		try {
+			this.messageQueue.push({
+				message: message,
+				options: { parse_mode: "Markdown" },
+			});
+			this.processMessageQueue();
+		} catch (error) {
+			logger.error({ error }, "Failed to enqueue message:");
+			throw error;
+		}
+	}
+
+	private formatLogMessage(log: LogPayload): string {
+		const levelIcons = {
+			info: "ℹ️",
+			warn: "⚠️",
+			error: "🔥",
+			fatal: "🚨",
+		};
+
+		const icon = levelIcons[log.level] || "⚙️";
+		const title = `${icon} *${log.level.toUpperCase()}* in *${log.service}*`;
+
+		const parts: string[] = [title, `*Message:* ${log.message}`];
+
+		parts.push(`*Environment:* ${log.env}`);
+
+		if (log.context && Object.keys(log.context).length > 0) {
+			parts.push(
+				`*Context:*
+\`\`\`json
+${JSON.stringify(log.context, null, 2)}
+\`\`\``
+			);
+		}
+
+		return this.truncateMessage(parts.join("\n\n"));
+	}
+
 	private formatMessage(message: TelegramMessage): string {
-		const parts: string[] = [message.text];
+		const parts: string[] = [this.escapeMarkdown(message.text)];
 
 		if (message.meta?.boardId) {
-			parts.push(`\n\n[#] Board: ${message.meta.boardId}`);
+			parts.push(`\n\n[#] Board: ${this.escapeMarkdown(message.meta.boardId)}`);
 		}
 
 		parts.push(
-			`\n\n[#] Environment: ${message.env || "unknown environment"}`,
+			`\n\n[#] Environment: ${this.escapeMarkdown(message.env || "unknown environment")}`,
 		);
 
 		if (message.meta?.operationContext) {
 			const ctx = message.meta.operationContext;
+
+			const requestType = this.escapeMarkdown(ctx.requestType);
+			const model = this.escapeMarkdown(ctx.model || "N/A");
+
 			parts.push(`\n
 ⚙ Operation Details:
-• Type: ${ctx.requestType}
-• Model: ${ctx.model || "N/A"}
+• Type: ${requestType}
+• Model: ${model}
 • Duration: ${Date.now() - ctx.startTime}ms`);
 
 			if (ctx.pipelineSteps) {
@@ -314,7 +386,8 @@ class TelegramNotifier {
 								: step.status === "error"
 									? "✗"
 									: "…";
-						return `${icon} ${step.name}`;
+						// Экранируем название каждого шага
+						return `${icon} ${this.escapeMarkdown(step.name)}`;
 					})
 					.join("\n");
 				parts.push(`\n\n⚡ Pipeline Status:\n${steps}`);
@@ -325,9 +398,9 @@ class TelegramNotifier {
 			const ctx = message.meta.errorContext;
 			parts.push(`\n\n
 ⚠ Error Details:
-• Board: ${ctx.boardId}
-• Chat: ${ctx.chatId}
-• Time: ${ctx.timestamp}
+• Board: ${this.escapeMarkdown(ctx.boardId)}
+• Chat: ${this.escapeMarkdown(ctx.chatId)}
+• Time: ${this.escapeMarkdown(ctx.timestamp)}
 • Active Operations: ${ctx.activeOperations.length}
 • Active Streams: ${ctx.activeStreams.length}`);
 		}
@@ -418,6 +491,34 @@ async function main() {
 				logger.error({ error }, "Notification error");
 				return c.json(
 					{ success: false, error: "Failed to send notification" },
+					500,
+				);
+			}
+		},
+	);
+
+	app.post(
+		"/log",
+		zValidator(
+			"json",
+			z.object({
+				level: z.enum(["info", "warn", "error", "fatal"]),
+				message: z.string(),
+				service: z.string(),
+				env: z.string(),
+				context: z.record(z.any()).optional(),
+			}),
+		),
+		async c => {
+			try {
+				const body = c.req.valid("json");
+				logger.info({ body }, "Received log");
+				await telegramNotifier.sendLog(body as LogPayload);
+				return c.json({ success: true });
+			} catch (error) {
+				logger.error({ error }, "Log sending error");
+				return c.json(
+					{ success: false, error: "Failed to send log" },
 					500,
 				);
 			}
